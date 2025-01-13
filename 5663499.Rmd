@@ -1,0 +1,371 @@
+---
+title: 'Business Statistics End of Term Assessment IB94X0 2024-2025 #2'
+author: '5663499'
+output:
+  html_document:
+    toc: yes
+    toc_depth: 3
+---
+
+---
+
+**Declaration**
+
+This is to certify that the work I am submitting is my own. All external references and sources are clearly acknowledged and identified within the contents. I am aware of the University of Warwick regulation concerning plagiarism and collusion.
+
+No substantial part(s) of the work submitted here has also been submitted by me in other assessments for accredited courses of study, and I acknowledge that if this has been done an appropriate reduction in the mark, I might otherwise have received will be made.
+
+AI was used in the preparation of this work. It was used in the development of the code: It was used to provide example uses of functions or approaches to elements of the challenges which were then interpreted by me and modified to be applicable to this data/report.
+
+---
+
+```{r setup, message=FALSE, warning=FALSE}
+# Importing the necessary R libraries
+library(tidyverse)
+library(gridExtra)
+library(grid)
+library(emmeans) # for emmeans() and pairs()
+library(lubridate)
+library(Hmisc) # for correlation functions
+library(car) # for vif()
+library(dplyr)
+```
+
+# Question 1
+
+## Importing the data
+
+```{r}
+# Importing the CSV file
+cardio.disease <- read_csv("Cardio_Vascular_Disease.txt")
+
+# Get the imported table's specifications
+spec(cardio.disease)
+```
+
+
+**Data Table**
+
+This data is from various datasets from the UK Office for National Statistics where each row of the data represents one local authority region. The table shows the part of population that is suffering from factors like overweight, smokers, wellbeing and poverty. The variables are described in the table below:
+
+Variable | Description
+-------------|-------------
+area_name | Name of the city where the data was collected
+area_code | Pincode of the area where the data was collected
+Population | Amount of people living in that area
+Poverty | Percentage of people living in poverty in that area
+CVD | Percentage of people who suffers from Cardiovascular Disease (CVD) in that area
+overweight | Percentage of people who are overweight in that area
+smokers | Percentage of people who are smokers in that area
+wellbeing | Average wellbeing score of people living in that area
+
+## Performing Exploratory Data Analysis (EDA)
+
+```{r}
+# Print the first 5 rows of the imported data table
+head(cardio.disease)
+```
+```{r}
+# Summarise the imported table data and get the details about each column to better understand the data
+summary(cardio.disease)
+```
+```{r}
+# Check for the NA values present in our dataset
+summarise_all( cardio.disease , ~ sum (is.na(.x)))
+```
+
+From the above summary we can see the `NA` values present in the data. There are 76 `NA` values in the *Population*, *Poverty* and *CVD* Columns. 72 `NA` values in *overweight* column, 7 `NA` values in *smokers* column and 15 `NA` values in *wellbeing* column.
+
+```{r}
+# To check the number of unique values present in the area_name column
+distinct_areas <- length(unique(cardio.disease$area_name))
+print(distinct_areas)
+```
+
+There are 385 different distinct areas present in the data table.
+
+```{r}
+# To check if there are any repeated values present in the area_code column
+repeated_code <- cardio.disease$area_code[duplicated(cardio.disease$area_code)]
+print(repeated_code)
+```
+
+There are no repeated values in the *area_code* column.
+
+```{r}
+# To check if there are any repeated values present in the area_name column
+repeated_area <- cardio.disease$area_name[duplicated(cardio.disease$area_name)]
+print(repeated_area)
+```
+
+There are no repeated values in the *area_name* column.
+
+```{r, warning=FALSE}
+# Plotting the histogram graph for all the different columns and arranging them in a grid
+grid.arrange(
+ggplot(cardio.disease) + geom_histogram(aes(Population), bins = 30),
+ggplot(cardio.disease) + geom_histogram(aes(Poverty), bins = 30),
+ggplot(cardio.disease) + geom_histogram(aes(CVD), bins = 30),
+ggplot(cardio.disease) + geom_histogram(aes(overweight), bins = 30),
+ggplot(cardio.disease) + geom_histogram(aes(smokers), bins = 30),
+ggplot(cardio.disease) + geom_histogram(aes(wellbeing), bins = 30)
+)
+```
+
+To check for the outlier present in the data, we can use Histogram to check for these outlier. After plotting the data using histogram, we notice that *Population* column contain some outlier but as these values represent the number of people living in that specific area, so it is logical for them to be present. The remaining columns doesn't contain any noticeable outlier and the few noticeable ones that are present are logical.
+
+## Performing Data Manipulation
+
+```{r}
+# Dealing with the NA values present in the dataset by removing them
+cardio.disease <- na.omit(cardio.disease)
+summarise_all( cardio.disease , ~ sum (is.na(.x)))
+```
+
+To deal with the `NA` values, as the columns where missing values are present, span over multiple columns in the same row, it would be better to remove the rows which contain the `NA` value as filling them with any different type of values (mean, median, mode, average, minimum or maximum) would effect the calculations as the data is from real world scenario.
+
+## Performing statistical modelling and analysis
+
+```{r}
+# Make the correlation matrix between all the columns
+rcorr(as.matrix(select_if(cardio.disease, is.numeric)))
+```
+
+The correlation analysis is conducted using correlation matrix to examine the relationships among variables related to *cardiovascular disease* (CVD): *Population*, *Poverty*, *CVD* prevalence, *Overweight*, *Smokers*, and *Wellbeing*. The correlation coefficients ($𝑟$) and corresponding p-values are summarized above.
+
+The analysis reveals significant associations between *CVD* and factors such as being *overweight*, *smoking*, *wellbeing*, and *poverty*. Notably, *smoking* and being *overweight* are more strongly correlated with *CVD* compared to other factors. The results highlight the importance of targeted interventions addressing *overweight* and *smoking* to mitigate *CVD* risks.
+
+```{r}
+# Performing multiple regression by developing a base model (model 1)
+m.cvd.1 <- lm(CVD ~ Poverty + wellbeing + smokers + overweight, data= cardio.disease)
+summary(m.cvd.1)
+```
+```{r}
+# Finding the confidence intervals of the estimate mean values of the model 1
+confint(m.cvd.1)
+```
+
+Multiple Regression shows that with every one 1 percent increase in *wellbeing* ($b = 1.80$, CI = [0.834, 2.766], $t(298)=3.667$, $p=0.0002$) *CVD* rate increases by 1.8 percent, for every 1 percent increase in *smokers* ($b = 0.120$, CI = [0.054, 0.186], $t(298)=3.574$, $p=0.0004$) *CVD* rate increase by 0.12 percent and for every 1 percent increase in *overweight* ($b = 0.109$, CI = [0.068, 0.151], $t(298)=5.174$, $p<0.05$) *CVD* rate increases by 0.109 percent which shows a significant positive impact upon *CVD* which means as *wellbeing*, *smokers* and *overweight* rate increases, *CVD* also increase. Whereas with every 1 percent increase in *Poverty* ($b = -0.184$, CI = [-0.253, -0.114], $t(298)=-5.234$, $p<0.05$) *CVD* rate decreases by 0.18 percent which means it has a Negative impact on *CVD* which means as *Poverty* increases, the rate of *cardiovascular disease* decreases.
+
+```{r}
+# Varience Inflation Factor score calculations for all the variables
+vif(m.cvd.1)
+```
+
+We can use Variance Inflation Factor scores (VIFs) to get a measure of collinearity within our regression models.
+Generally, VIF scores of less than 5 don’t warrant any further action. When they are greater than 5 we have to consider whether it is justified keeping all of the predictors in the model. But as the VIF scores of our model's variables is very less, we do not need to worry about the collinearity within our model.
+
+```{r}
+# Performing multiple regression by introducing interaction term in the model 2
+m.cvd.2 <- lm(CVD ~ Poverty*overweight + smokers + wellbeing, data= cardio.disease)
+summary(m.cvd.2)
+```
+```{r}
+# Finding the confidence intervals of the estimate mean values of the model 2
+confint(m.cvd.2)
+```
+
+Multiple Regression using interaction term between *Povery and Overweight* shows that with every one 1 percent increase in *wellbeing* ($b = 1.71$, CI = [0.763, 2.680], $t(297)=3.536$, $p=0.0004$) *CVD* rate increases by 1.7 percent, for every 1 percent increase in *smokers* ($b = 0.110$, CI = [0.044, 0.176], $t(297)=3.302$, $p=0.001$) *CVD* rate increase by 0.11 percent and for every 1 percent increase in *poverty and overweight* interaction ($b = 0.014$, CI = [0.003, 0.025], $t(297)=2.648$, $p=0.008$) *CVD* rate increases by 0.014 percent which shows a significant positive impact upon *CVD*. Whereas with every 1 percent increase in *Poverty* ($b = -0.533$, CI = [-0.802, -0.264], $t(297)=-3.909$, $p=0.0001$) *CVD* rate decreases by 0.53 percent and with every 1 percent increase in *overweight* ($b = -0.185$, CI = [-0.409, 0.037], $t(297)=-1.635$, $p=0.103$) *CVD* rate decreases by 0.18 percent which is not statistically significant. This shows that these two have a Negative impact on *CVD*.
+
+```{r}
+# Performing the analysis of variance on the two models to check for any performance increase between the two models
+anova(m.cvd.1, m.cvd.2)
+```
+
+The ANOVA results compare the base model (model 1) and the interaction model (model 2) to assess whether including the interaction term (Poverty * Overweight) significantly improves the model’s performance. The addition of the interaction term reduces the Residual Sum of Squares (RSS) from 1068.6 in the model 1 to 1043.9 in the model 2, indicating a better fit. This improvement is supported by an F-statistic of 7.013 (p = 0.0085), demonstrating that the interaction term makes a minor significant difference to the model. The interaction model also explains slightly more variance in *CVD* rates, with an R² of 0.2667 compared to 0.2494 in the base model. This indicates that the interaction between *Poverty and Overweight* contributes some valuable insights for understanding *CVD* rates.
+
+## Visualisation
+
+```{r}
+# Plotting the interaction of CVD with other variables as a scatter plot
+grid.arrange(
+ggplot(cardio.disease, aes(y=CVD, x=Poverty)) + geom_jitter(width=.0, height=0.1) + geom_smooth(method ="lm"),
+ggplot(cardio.disease, aes(y=CVD, x=wellbeing)) + geom_jitter(width=0, height=0.1) + geom_smooth(method ="lm"),
+ggplot(cardio.disease, aes(y=CVD, x=smokers)) + geom_jitter(width=0, height=0.1) + geom_smooth(method ="lm"),
+ggplot(cardio.disease, aes(y=CVD, x=overweight)) + geom_jitter(width=0, height=0.1) + geom_smooth(method ="lm"),
+ncol=2)
+```
+
+The scatter plot above supports our analysis and shows a positive relationship between *wellbeing*, *smokers*, *overweight* and *CVD* whereas a negative relation can be seen between *Poverty* and *CVD*.
+
+```{r}
+ggplot(cardio.disease, aes(y=CVD, x=Poverty)) + geom_jitter(width=0, height=0.1) + labs(x="Poverty", y="CVD", title=expression()) + geom_smooth(method='lm')
+```
+
+The above scatter plot and regression line signifies the negative relation between *CVD* and *Poverty*. This means that as the *Poverty* percentage increases, the *CVD* percentage decreases.
+
+## Conclusion
+
+The analysis of cardiovascular disease (CVD) prevalence across different local authority regions in the UK highlights significant relationships with factors such as poverty, smoking, being overweight, and wellbeing. Our multiple regression models reveal that higher rates of smoking, overweight, and lower wellbeing are positively associated with higher CVD prevalence, while poverty has a negative relationship with CVD, meaning that higher poverty levels correspond to lower CVD rates. The inclusion of an interaction term between poverty and overweight in the second model improved the model fit, demonstrating a complex interplay between these factors in influencing CVD rates. The results emphasize the need for targeted interventions to reduce smoking, manage obesity, and improve wellbeing, while addressing socioeconomic disparities, as these factors collectively contribute to CVD risk. Visualizations further support these findings, with scatter plots showing clear relationships between CVD and the predictors, particularly the inverse relationship between poverty and CVD prevalence.
+
+---
+
+# Question 2
+
+## Importing the data
+
+```{r}
+# Importing the CSV file
+cust.satisfaction <- read_csv("cust_satisfaction.txt")
+
+# Get the imported table's specifications
+spec(cust.satisfaction)
+```
+
+
+**Data Table**
+
+This data is provided by a furniture retail company. The variables are described in the table below:
+
+Variable | Description
+-------------|-------------
+SES_category | Company’s categorisation of store type by local Socio Economic-Status
+customer.satisfaction | Average customer satisfaction score
+staff.satisfaction | Average staff job satisfaction score
+delivery.time | Average delivery time of large and custom items
+new_range | Whether the store was carrying a new range of products or not
+  
+```{r}
+# Renaming the column names for better interpretation
+cust.satisfaction <- cust.satisfaction %>%
+  rename(
+    SESCategory = SES_category,
+    CustSatisfaction = customer.satisfaction,
+    StaffSatisfaction = staff.satisfaction,
+    DeliveryTime = delivery.time,
+    NewRange = new_range
+  )
+```
+
+## Performing Exploratory Data Analysis (EDA)
+
+```{r}
+# Print the first 5 rows of the imported data table
+head(cust.satisfaction)
+```
+
+```{r}
+# Summarise the imported table data and getting the details about each column to better understand the data
+summary(cust.satisfaction)
+```
+
+```{r}
+# Check for the NA values present in our dataset
+summarise_all( cust.satisfaction , ~ sum (is.na(.x)))
+```
+
+From the above table we can see that there are no `NA` values in our dataset.
+
+```{r, warning=FALSE}
+# Plotting the histogram graph for the different columns
+grid.arrange(
+ggplot(cust.satisfaction) + geom_histogram(aes(CustSatisfaction), bins = 20),
+ggplot(cust.satisfaction) + geom_histogram(aes(StaffSatisfaction), bins = 20),
+ggplot(cust.satisfaction) + geom_histogram(aes(DeliveryTime), bins = 20)
+)
+```
+
+The histogram shows the absence of any outliers present in our data. 
+
+## Performing statistical modelling and analysis
+
+```{r}
+# Convert the SESCategory HIGH, MEDIUM and LOW into Factors
+cust.satisfaction$SESCategory <- factor(cust.satisfaction$SESCategory, levels = c("Low", "Medium", "High"))
+# Summarise the amount of data present in each category of SESCategory column
+cust.satisfaction %>% group_by(SESCategory) %>% summarise(n())
+```
+
+As now we have prepared our data for the modelling, we can move on the modelling part.
+
+```{r}
+# Performing multiple regression by developing a base model (without the interaction term)
+m.cust.satisfaction <- lm(CustSatisfaction ~ SESCategory + DeliveryTime + StaffSatisfaction + NewRange, data = cust.satisfaction)
+summary(m.cust.satisfaction)
+```
+```{r}
+# Finding the confidence intervals of the estimate mean values of the model 
+confint(m.cust.satisfaction)
+```
+
+The *baseline customer satisfaction* score ($b = 4.962$, CI = [3.771, 6.153], $t(294)=8.200$, $p<0.05$) when all predictors are at their reference levels (e.g., *SES* is low, *DeliveryTime* = 0, *NewRange* is `FALSE` etc.) is approximately 4.96.
+Stores in *medium SES* areas ($b = 1.465$, CI = [1.158, 1.771], $t(294)=9.416$, $p<0.05$) have a *customer satisfaction* score that is, on average, 1.47 points higher than stores in *low SES* areas, holding all else constant.
+Stores in *high SES* areas ($b = 0.255$, CI = [-0.016, 0.528], $t(294)=1.846$, $p=0.06$) have a *customer satisfaction* score 0.26 points higher than *low SES* stores. This effect is marginally significant.
+Each additional unit increase in *delivery time* ($b = -0.017$, CI = [-0.026, -0.007], $t(294)=-3.480$, $p=0.0005$) is associated with a decrease in *customer satisfaction* by 0.017 points, holding other variables constant. This effect is also statistically significant.
+Whereas a one-unit increase in *staff satisfaction* ($b = 0.351$, CI = [0.192, 0.509], $t(294)=4.364$, $p<0.05$) is associated with a 0.35-point increase in *customer satisfaction*. This effect is significant.
+Stores carrying the *new product range* ($b = 0.093$, CI = [-0.127, 0.314], $t(294)=0.836$, $p=0.403$) have a customer satisfaction score 0.094 points higher than those that do not, but this effect is not statistically significant.
+
+```{r}
+# Varience Inflation Factor score calculations for all the variables
+vif(m.cust.satisfaction, type='predictor')
+```
+
+We can use Variance Inflation Factor scores (VIFs) to get a measure of collinearity within our regression model predictors. All the predictors show low GVIF values, indicating that multicollinearity is not a significant concern in this model. This means that the predictors are sufficiently independent of each other, and the regression model is likely to provide stable and reliable coefficient estimates.
+
+```{r}
+# Performing multiple regression by developing a base model (with the interaction term)
+m.cust.satisfaction.2 <- lm(CustSatisfaction ~ DeliveryTime * SESCategory + StaffSatisfaction + NewRange, data = cust.satisfaction)
+summary(m.cust.satisfaction.2)
+```
+```{r}
+# Finding the confidence intervals of the estimate mean values of the model 
+confint(m.cust.satisfaction.2)
+```
+
+The model shows a slight improvement over the base model, with an $R^2$ of 0.460 and an Adjusted $R^2$ of 0.447, meaning it explains a bit more of the variation in *customer satisfaction*. The residual standard error drops to 0.960, indicating better prediction accuracy. *Medium SES* stores report *customer satisfaction* scores that are 2.22 points higher than *low SES* stores ($p = 0.00179$), and *high SES* stores score 2.23 points higher ($p = 0.00329$). *Staff satisfaction* has a notable positive effect, with a 0.36 point increase in satisfaction for every one-unit increase in *staff satisfaction* ($p < 0.001$). *Delivery time*, by itself, doesn’t significantly affect *customer satisfaction* ($p = 0.63049$), but in *high SES* stores, longer *delivery times* lead to a significant drop in satisfaction ($Estimate = -0.0325$ , $p = 0.00800$). The interaction term highlights how the effect of *delivery time* varies across *SES* groups, showing no significant impact for *medium SES* stores ($p = 0.29548$). Carrying a new product range does not significantly impact satisfaction ($p = 0.35103$). These findings suggest that improving delivery strategies in *high SES* areas and focusing on boosting *staff satisfaction* in all stores would be effective ways to increase *customer satisfaction*.
+
+```{r}
+# Performing the analysis of variance on the two models to check for any performance increase between the two models
+anova(m.cust.satisfaction, m.cust.satisfaction.2)
+```
+
+The ANOVA results compare the base model (without the interaction term) and the interaction model (with the interaction term) to assess whether including the interaction term (*DeliveryTime* * *SESCategory*) significantly improves the model’s performance. The addition of the interaction term reduces the Residual Sum of Squares (RSS) from 275.86 in the model 1 to 269.26 in the model 2, indicating a better fit. This improvement is supported by an F-statistic of 3.5805 (p = 0.02909), demonstrating that the interaction term makes a significant difference to the model. The interaction model also explains slightly more variance in *Customer Satisfaction* rates, with an R² of 0.2667 compared to 0.2494 in the base model. This indicates that the interaction between *Poverty* and *Overweight* contributes valuable insights for understanding *CVD* rates.
+
+```{r}
+# Create a sequence of 5 evenly spaced delivery time values ranging from the minimum to the maximum delivery time in the dataset. 
+# This will be used for predictions or plotting to analyze the relationship between DeliveryTime and other variables.
+delivery_time_range <- seq(min(cust.satisfaction$DeliveryTime),
+                           max(cust.satisfaction$DeliveryTime),
+                           length.out = 5)
+```
+
+```{r}
+# Calculate the estimated marginal means (EMMs) for DeliveryTime across different SESCategory levels
+emm <- emmeans(m.cust.satisfaction.2, ~DeliveryTime | SESCategory, at = list(DeliveryTime = delivery_time_range))
+print(emm)
+```
+
+Emmeans calculates marginal means using *m.cust.satisfaction.2*, focusing on the relationship between *DeliveryTime* and *SESCategory*. It predicts the *customer satisfaction* values at specific *DeliveryTime* points for each *SESCategory*, based on the interaction between *DeliveryTime* and *SESCategory* in the model.a
+
+```{r}
+pairs(emm)
+```
+
+From the above output, we can interpret these outcomes:
+
+*Low SES Category*: The comparisons between different delivery times (32.96, 47.84, 62.72, 77.6, 92.48) show very small estimates (ranging from 0.0571 to 0.2285), all with high p-values ($p > 0.989$). This suggests that in low SES stores, delivery time does not significantly affect customer satisfaction.
+
+*Medium SES Category*: Similarly, in medium SES stores, all pairwise comparisons of delivery times show modest estimates (ranging from 0.2384 to 0.9535) with p-values greater than 0.3241. These results suggest that delivery time does not have a significant impact on customer satisfaction in medium SES stores either.
+
+*High SES Category*: In high SES stores, there are significant differences between delivery times, with all pairwise comparisons showing large estimates (ranging from 0.5402 to 2.1606) and highly significant p-values ($p < 0.001$). This indicates that in high SES stores, delivery time has a significant negative effect on customer satisfaction, with longer delivery times leading to lower satisfaction scores.
+
+The delivery time effect on customer satisfaction is significant only in high SES stores, where longer delivery times are associated with a substantial decrease in satisfaction. In contrast, for low and medium SES stores, delivery time does not significantly affect customer satisfaction. These findings suggest that addressing delivery times may have a stronger impact in high SES areas.
+
+## Visualisation
+
+```{r}
+# Plotting the Scatter plot for DeliveryTime and CustSatisfaction based on different SESCategory
+ggplot(cust.satisfaction, aes(x = DeliveryTime, y = CustSatisfaction, color = SESCategory)) +
+  labs(x="Delivery Time", y="Customer Satisfaction", title=expression()) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  theme_minimal()
+```
+
+The Scatter plot above shows the relation between *DeliveryTime* and *CustSatisfaction* based on *SESCategory*. All the *SESCategory* (i.e. High, Medium and Low) displays a negative relation for *CustSatisfaction* and *DeliveryTime* which means as *DeliveryTime* increases, the *CustSatisfaction* decreases.
+
+## Conclusion
+
+The analysis shows that customer satisfaction is influenced by several factors, including the socio-economic status (SES) of the store's location. Stores in medium SES areas tend to have higher customer satisfaction scores compared to low SES stores, and high SES stores also have slightly higher satisfaction scores, though the difference is smaller. Delivery time only affects satisfaction in high SES stores—longer delivery times lead to lower satisfaction. Staff satisfaction plays an important role, with higher staff satisfaction linked to higher customer satisfaction. However, offering a new range of products does not significantly impact satisfaction. By adding an interaction term between delivery time and SES, the model’s accuracy improved slightly, indicating that delivery time affects satisfaction differently depending on the SES of the store's location. Overall, focusing on faster delivery and improving staff satisfaction, especially in high SES areas, would be effective ways to boost customer satisfaction.
+
+---
